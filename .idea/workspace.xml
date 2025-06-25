@@ -5,7 +5,6 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="95127af6-f8da-4f16-9c9c-56b9982cd036" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/backend.js" beforeDir="false" afterPath="$PROJECT_DIR$/backend.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/overlay/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/overlay/index.html" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -17,7 +16,7 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="file://$PROJECT_DIR$/package.json" root0="SKIP_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/package.json" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="MetaFilesCheckinStateConfiguration" checkMetaFiles="true" />
   <component name="ProjectColorInfo">{
@@ -53,6 +52,7 @@
       <workItem from="1749647049318" duration="1566000" />
       <workItem from="1750243842314" duration="1158000" />
       <workItem from="1750247644168" duration="702000" />
+      <workItem from="1750249168489" duration="1973000" />
     </task>
     <servers />
   </component>
