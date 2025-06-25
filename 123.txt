@@ -1,0 +1,792 @@
+mam taką apkę które pobiera dane ze strony epbf. jest to overlay do streamowania
+
+chce przerobic ją tak aby dane były pobierane z innej strony
+
+sciezka ma wygladac tak: z linku overlay ma byc pobierane ID gracza i ma byc wrzucane do https://api.cuescore.com/participant/?id=5408975  gdzie np 5408975   to id gracza. z tego jsona w polu "url" jest adres do strony gracza np "url": "https://cuescore.com/player/Alan+Mitchell/5408975". ze źródła strony z tego linku ponierac ma live match tego gracza, np
+
+<div class="liveMatches card">  <h2>Na żywo</h2>  <div class="match">  <div class="matchdetails">    <div>      <div class="date">17 cze 2025, 10:26</div>      <div class="name"><a class="bold" href="//cuescore.com/tournament/NOTTS+OPEN/62307754#match-2">NOTTS OPEN - Match 2</a></div>      
+
+
+
+z tego linku warto wyciagnac same turnament id np 62307754 i z api np https://api.cuescore.com/tournament/?id=62307754 wyciagac dane potrzebne do overlay, np score obu graczy, flagi
+
+przyklad wycinku json ktory znalazłem po id gracza 5408975 
+
+{
+
+"matchId": 62307766,
+
+"matchno": 2,
+
+"roundName": "Runda 1",
+
+"round": 1,
+
+"playerA": {
+
+"playerId": 5408975,
+
+"name": "Alan Mitchell",
+
+"firstname": "Alan",
+
+"lastname": "Mitchell",
+
+"url": "https://cuescore.com/player/Alan+Mitchell/5408975",
+
+"image": "https://img.cuescore.com/image/e/4/efb55e1547a80a7e69c7cd82ba22fc41.png",
+
+"country": {
+
+"name": "United Kingdom",
+
+"alpha3": "GBR",
+
+"image": "https://cuescore.com/img/flags/png-country-4x2-none/res-640x480/gb.png",
+
+"continent": "Europe"
+
+},
+
+"represents": []
+
+},
+
+"playerB": {
+
+"playerId": 56922832,
+
+"name": "Tommy Donlan",
+
+"firstname": "Tommy",
+
+"lastname": "Donlan",
+
+"url": "https://cuescore.com/player/Tommy+Donlan/56922832",
+
+"image": "https://img.cuescore.com/image/8/4/862c792ba8eb7f97e626fbe6cbcc59f6.png",
+
+"country": {
+
+"name": "United Kingdom",
+
+"alpha3": "GBR",
+
+"image": "https://cuescore.com/img/flags/png-country-4x2-none/res-640x480/gb.png",
+
+"continent": "Europe"
+
+},
+
+"represents": []
+
+},
+
+"scoreA": 0,
+
+"scoreB": 0,
+
+"raceTo": 7,
+
+"discipline": "Blackball",
+
+"disciplineId": 301,
+
+"branch": 2,
+
+"penalty": 0,
+
+"groupNo": 0,
+
+"inningsPlayerA": 0,
+
+"inningsPlayerB": 0,
+
+"highBreaksA": "",
+
+"highBreaksB": "",
+
+"runoutsA": 0,
+
+"runoutsB": 0,
+
+"lagWinner": "",
+
+"table": [],
+
+"tournamentId": 62307754,
+
+"challengeId": 0,
+
+"starttime": "2025-06-17T10:26:00",
+
+"stoptime": "2025-06-17T11:16:50",
+
+"matchstatus": "playing",
+
+"matchstatusCode": 1,
+
+"bestOfSets": 0,
+
+"useInnings": false,
+
+"frames": [],
+
+"properties": {
+
+"penalty": []
+
+},
+
+"sets": [],
+
+"curVersion": 47,
+
+"notes": [],
+
+"matchType": 0,
+
+"videoLink": "",
+
+"comment": "",
+
+"winnerNext": 17,
+
+"loserNext": ""
+
+},
+
+
+
+wszystkie wiersze które mają to id gracza mają byc dodawane do wynikowego json który będzie uzywał overlay, ostatni mecz będzie wyswietlany jako główny na overlay a reszta przejdzie do wyswietlanej historii
+
+
+
+
+Show thinking
+Jasne, rozumiem. Chcesz gruntownie przerobić swoją aplikację do wyświetlania wyników (overlay), aby zamiast scrapować stronę EPBF, korzystała z API oraz strony Cuescore. To dobry pomysł, ponieważ API jest znacznie stabilniejszym i bardziej niezawodnym źródłem danych niż scrapowanie dynamicznie generowanej strony.
+
+Poniżej przedstawiam szczegółowy plan działania oraz gotowe, zmodyfikowane kody do plików backend.js i index.html, które realizują opisaną przez Ciebie logikę.
+
+Plan Działania
+Nowy przepływ danych będzie wyglądał następująco:
+
+Frontend (index.html): Otwierany z parametrem ?playerId=ID_GRACZA_CUESCORE (np. ?playerId=5408975).
+Frontend (index.html): Wysyła zapytanie do Twojego backendu, podając tylko playerId.
+Backend (backend.js): a. Otrzymuje playerId. b. Krok 1: Scraping strony gracza po ID turnieju. Backend odpytuje stronę profilową gracza na Cuescore (np. https://cuescore.com/player/Alan+Mitchell/5408975), aby znaleźć link do aktualnie granego turnieju. To jest kluczowy i najmniej stabilny element - zakładamy, że na stronie gracza zawsze będzie sekcja "Na żywo" (liveMatches), gdy faktycznie gra. c. Krok 2: Pobranie danych o turnieju. Z linku znalezionego w poprzednim kroku wyciąga tournamentId. d. Krok 3: Pobranie danych z API. Używa tournamentId do odpytania API Cuescore (https://api.cuescore.com/tournament/?id=...), skąd pobiera pełne dane o wszystkich meczach w turnieju. e. Krok 4: Filtrowanie i formatowanie danych. Przetwarza otrzymaną listę meczy: * Wybiera tylko te, w których uczestniczy gracz o podanym playerId. * Ostatni mecz z tej listy traktuje jako aktualny (do wyświetlenia na głównym pasku). * Pozostałe mecze formatuje jako historię. * Tworzy obiekt JSON w formacie zrozumiałym dla Twojego frontendu i go odsyła.
+Frontend (index.html): Otrzymuje dane JSON z backendu i renderuje overlay, tak jak poprzednio.
+Zmodyfikowany Kod backend.js
+Ten kod zastępuje całą dotychczasową logikę scrapowania EPBF. Zaimplementowałem w nim nowy przepływ danych z Cuescore.
+
+JavaScript
+
+const express = require('express');
+const axios = require('axios');
+const cheerio = require('cheerio'); // Cheerio jest nadal potrzebne do scrapowania strony gracza
+const cors = require('cors');
+
+const app = express();
+app.use(cors());
+
+const PORT = process.env.PORT || 3000;
+
+// Funkcja pomocnicza do upewnienia się, że URL jest pełny
+function ensureAbsoluteUrl(url) {
+    if (url.startsWith('//')) {
+        return `https:${url}`;
+    }
+    if (url.startsWith('http')) {
+        return url;
+    }
+    return `https://cuescore.com${url}`;
+}
+
+app.get('/score', async (req, res) => {
+    const { playerId } = req.query;
+
+    if (!playerId) {
+        return res.status(400).json({ error: 'Missing playerId parameter' });
+    }
+
+    try {
+        // KROK 1: Pobierz URL strony gracza z API Cuescore, aby mieć pewność, że mamy poprawny link
+        const participantApiUrl = `https://api.cuescore.com/participant/?id=${playerId}`;
+        const participantResponse = await axios.get(participantApiUrl);
+        const playerPageUrl = ensureAbsoluteUrl(participantResponse.data.url);
+
+        if (!playerPageUrl) {
+            return res.status(404).json({ error: 'Player URL not found in Cuescore participant API.' });
+        }
+
+        // KROK 2: Scrapuj stronę gracza w poszukiwaniu linku do turnieju na żywo
+        const playerPageHtml = (await axios.get(playerPageUrl)).data;
+        const $ = cheerio.load(playerPageHtml);
+        
+        const liveMatchLink = $('.liveMatches .match .name a').attr('href');
+        
+        if (!liveMatchLink) {
+            return res.status(404).json({ error: 'No live match found on player\'s Cuescore page.' });
+        }
+
+        // KROK 3: Wyciągnij ID turnieju z linku
+        const tournamentIdMatch = liveMatchLink.match(/tournament\/[^\/]+\/(\d+)/);
+        if (!tournamentIdMatch || !tournamentIdMatch[1]) {
+            return res.status(500).json({ error: 'Could not extract tournamentId from live match link.' });
+        }
+        const tournamentId = tournamentIdMatch[1];
+
+        // KROK 4: Użyj ID turnieju, aby pobrać wszystkie dane o meczach z API
+        const tournamentApiUrl = `https://api.cuescore.com/tournament/?id=${tournamentId}`;
+        const tournamentResponse = await axios.get(tournamentApiUrl);
+        const allTournamentMatches = tournamentResponse.data.matches;
+
+        // KROK 5: Filtruj mecze, aby znaleźć tylko te z udziałem naszego gracza
+        const playerMatches = allTournamentMatches.filter(match => 
+            match.playerA.playerId == playerId || match.playerB.playerId == playerId
+        );
+
+        if (playerMatches.length === 0) {
+            return res.status(404).json({ error: 'No matches found for the player in the live tournament.' });
+        }
+
+        // KROK 6: Mapuj dane do formatu oczekiwanego przez frontend
+        const formattedMatches = playerMatches.map(match => {
+            // Upewnij się, że "nasz" gracz jest zawsze jako player1
+            const isPlayerA = match.playerA.playerId == playerId;
+            
+            const playerA = match.playerA;
+            const playerB = match.playerB;
+
+            return {
+                matchId: match.matchId,
+                round: match.roundName,
+                player1: isPlayerA ? playerA.name : playerB.name,
+                player2: isPlayerA ? playerB.name : playerA.name,
+                score1: isPlayerA ? match.scoreA : match.scoreB,
+                score2: isPlayerA ? match.scoreB : match.scoreA,
+                raceTo: match.raceTo,
+                table: Array.isArray(match.table) ? match.table.join(', ') : match.table,
+                flag1: isPlayerA ? playerA.country?.image : playerB.country?.image,
+                flag2: isPlayerA ? playerB.country?.image : playerA.country?.image,
+                status: match.matchstatus, // "playing", "finished", etc.
+                discipline: match.discipline
+            };
+        });
+        
+        // Ostatni mecz to mecz bieżący
+        const currentMatch = formattedMatches.pop(); // Usuwa i zwraca ostatni element
+
+        // Reszta to historia
+        const history = formattedMatches.map(match => {
+            // Proste formatowanie historii
+            return `${match.round}: ${match.player1} ${match.score1} - ${match.score2} ${match.player2}`;
+        });
+
+        return res.json({
+            allMatches: [currentMatch], // Zwracamy jako tablicę z jednym elementem, aby pasowało do logiki frontendu
+            matchHistory: history.reverse() // Odwracamy, aby najnowsze mecze historii były na górze
+        });
+
+    } catch (e) {
+        console.error(e);
+        const errorMessage = e.response ? JSON.stringify(e.response.data) : e.message;
+        return res.status(500).json({ error: 'Failed to fetch or parse Cuescore data.', details: errorMessage });
+    }
+});
+
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+Zmodyfikowany Kod index.html
+Wprowadziłem drobne, ale konieczne zmiany w skrypcie JavaScript, aby poprawnie obsługiwał nowe dane i nowy sposób wywołania.
+
+HTML
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, initial-scale=1.0" />
+  <title>EPBF Overlay</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;700&display=swap" rel="stylesheet">
+ <style>
+html, body {
+  width: 1920px;
+  height: 1080px;
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+  font-family: 'Rajdhani', sans-serif;
+}
+
+@keyframes pulseDarkRed {
+  0%, 100% { background: #a80b1b; }
+  50% { background: #840808; }
+}
+
+@keyframes fadeLogoLoop {
+  0%, 40% { opacity: 1; }
+  50%, 90% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+#overlay-bar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 770px;
+  padding: 1.2px 9.6px;
+  background: linear-gradient(to right, rgba(188,33,48,0) 0%, #bc2130 15%, #bc2130 85%, rgba(188,33,48,0) 100%);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.decor-line {
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(to right, transparent 0%, #fff 50%, transparent 100%);
+  margin: 3px 0;
+}
+
+.player-line {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  width: 100%;
+  margin: 2px 0;
+}
+
+.score-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 150px;
+}
+
+.score-box {
+  display: flex;
+  align-items: center;
+  gap: 7.2px;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.player {
+  display: flex;
+  align-items: center;
+  gap: 14.4px;
+  font-size: 20px;
+}
+
+#leftPlayer {
+  justify-content: flex-end;
+  padding-right: 1px;
+}
+
+#rightPlayer {
+  justify-content: flex-start;
+  padding-left: 1px;
+}
+
+.player img {
+  width: 28px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.score {
+  background: #a80b1b;
+  padding: 2.4px 9.6px;
+  border-radius: 4.8px;
+  transition: background-color .5s;
+}
+
+.score-box.decisive .score {
+  animation: pulseDarkRed 2s infinite;
+}
+
+.score-win {
+  background: #FFD700 !important;
+  color: #000 !important;
+}
+
+.score-highlight {
+  background: #FFD700 !important;
+  color: #000 !important;
+}
+
+#raceToText {
+  font-size: 14.4px;
+  margin-top: 1.2px;
+  text-align: center;
+  width: 100%;
+}
+
+#watermark {
+  position: absolute;
+  bottom: 2px;
+  right: -170px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.8);
+}
+
+#logoLeftArea {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+#logoLeft {
+  height: 83px;
+}
+
+#eventTitle, #roundName, #tableText {
+  font-size: 24px;
+  font-weight: bold;
+  text-align: center;
+  line-height: 1.2;
+  color: #fff;
+  text-shadow: 1px 1px 4px #000;
+}
+
+#sponsorLogos {
+  position: fixed;
+  left: 20px;
+  bottom: 150px;
+  width: 120px;
+  height: 160px;
+  display: none;
+}
+
+.sponsor-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  position: absolute;
+  top: 0;
+  left: 0;
+  animation: fadeLogoLoop 15s ease-in-out infinite;
+  animation-fill-mode: both;
+}
+
+#logoLongoni {
+  animation-delay: 0s;
+}
+
+#logoTaom {
+  animation-delay: 7.5s;
+}
+
+#logoRight {
+  position: fixed;
+  top: 20px;
+  right: 30px;
+  width: 150px;
+  height: 150px;
+  z-index: 3;
+}
+
+#playerMatchHistoryContainer {
+  position: fixed;
+  top: 190px;
+  right: 10px;
+  max-width: 200px;
+  color: #fff;
+  background: rgba(0,0,0,.5);
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 16px;
+  white-space: nowrap;
+  display: none;
+  z-index: 10;
+}
+
+#playerMatchHistoryTitle {
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+#playerMatchHistoryList div {
+  margin-bottom: 4px;
+}
+
+#timeoutAlert {
+  position: fixed;
+  bottom: 105px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,.5);
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 24px;
+  font-weight: bold;
+  text-align: center;
+  font-family: 'Rajdhani', sans-serif;
+  display: none;
+  z-index: 20;
+  text-shadow: 1px 1px 4px #000;
+}
+</style>
+
+</head>
+<body>
+  <div id="logoLeftArea">
+    <img id="logoLeft" src="austrian_open.png" alt="Austrian Open">
+    <div id="eventTitle">Austrian Open<br>St.&nbsp;Johann&nbsp;im&nbsp;Pongau</div>
+    <div id="roundName"></div>
+    <div id="tableText">Table</div>
+  </div>
+
+  <div id="sponsorLogos">
+    <img class="sponsor-logo" id="logoLongoni" src="longoni_white.png" alt="Longoni">
+    <img class="sponsor-logo" id="logoTaom" src="taom_white.png" alt="Taom">
+  </div>
+
+  <img id="logoRight" src="logo_muklacademy_polysk_alpha.png" alt="MuklAcademy">
+
+  <div id="timeoutAlert">Timeout</div>
+
+  <div id="overlay-bar">
+    <div class="decor-line"></div>
+
+    <div class="player-line">
+      <div class="player" id="leftPlayer">
+        <img id="leftFlag" alt="flag1"><span id="player1">Player 1</span>
+      </div>
+
+      <div class="score-wrapper">
+        <div class="score-box" id="scoreBox">
+          <span class="score" id="score1">0</span>
+          <span class="dash">-</span>
+          <span class="score" id="score2">0</span>
+        </div>
+      </div>
+
+      <div class="player" id="rightPlayer">
+        <span id="player2">Player 2</span><img id="rightFlag" alt="flag2">
+      </div>
+    </div>
+
+
+    <div class="decor-line"></div>
+    <div id="raceToText">Race&nbsp;to&nbsp;0</div>
+    <div id="watermark">Overlay by Muklacademy/MarcinKwiecien</div>
+  </div>
+
+  <div id="playerMatchHistoryContainer">
+    <div id="playerMatchHistoryTitle"></div>
+    <div id="playerMatchHistoryList"></div>
+  </div>
+
+  <script>
+    const url = new URLSearchParams(window.location.search);
+    const pid = url.get('playerId');
+    // ZMIANA: Usunięto 'tournamentId', nie jest już potrzebne
+    
+    // ZMIANA: Ta logika sponsorów prawdopodobnie wymaga dostosowania do ID graczy z Cuescore
+    (function setupSponsorLogos(){
+      const box = document.getElementById('sponsorLogos');
+      const longo = document.getElementById('logoLongoni');
+      const taom = document.getElementById('logoTaom');
+
+      if(pid==='6494'){ // Przykładowe ID, zmień na ID Cuescore
+        box.style.display='block';
+        longo.style.opacity='1';
+        taom.style.opacity='0';
+      } else if(pid==='3355'){ // Przykładowe ID, zmień na ID Cuescore
+        box.style.display='block';
+        longo.style.display='none';
+        taom.style.display='block';
+        taom.style.animation='none';
+        taom.style.opacity='1';
+      } else {
+        box.style.display='none';
+      }
+    })();
+
+    let last={score1:null,score2:null};
+
+    async function updateOverlay(){
+      // ZMIANA: Usunięto warunek na 'tid' i zmieniono URL API
+      if(!pid){console.warn('Brak parametru playerId w adresie URL');return;}
+      const api=`http://localhost:3000/score?playerId=${pid}`; // Zmień na URL produkcyjny Twojego backendu
+      
+      try{
+        const r = await fetch(api); 
+        // ZMIANA: Lepsza obsługa błędów z API
+        if (!r.ok) {
+            const errData = await r.json();
+            console.error('Błąd pobierania danych:', errData.error);
+            return;
+        }
+        const d = await r.json();
+
+        if(!d.allMatches?.length) return;
+
+        const m = d.allMatches.at(0); // Bierzemy pierwszy (i jedyny) mecz z listy
+        updateNames(m); 
+        updateScores(m); 
+        updateMeta(m);
+        buildHistory(d.matchHistory||[]);
+        toggleTimeout(m.status);
+      }catch(e){console.error(e);}
+    }
+
+    function updateNames(m){
+      document.getElementById('player1').innerHTML = formatName(m.player1);
+      document.getElementById('player2').innerHTML = formatName(m.player2);
+      document.getElementById('leftFlag').src  = m.flag1 || ''; // Zabezpieczenie na wypadek braku flagi
+      document.getElementById('rightFlag').src = m.flag2 || '';
+    }
+
+    function updateScores(m){
+      const s1=parseInt(m.score1,10),s2=parseInt(m.score2,10);
+      setScore('score1',s1); setScore('score2',s2);
+
+      const race=parseInt(m.raceTo,10);
+      highlightWinner(document.getElementById('score1'),document.getElementById('score2'),s1,s2,race);
+      document.getElementById('scoreBox')
+              .classList.toggle('decisive',s1===race-1 && s2===race-1);
+
+      last={score1:s1,score2:s2};
+    }
+
+    function setScore(id,val){
+      const el=document.getElementById(id);
+      if(last[id]!==null && val!==last[id]){
+        el.classList.add('score-highlight');
+        setTimeout(()=>el.classList.remove('score-highlight'),2000);
+      }
+      el.textContent=val;
+    }
+
+    function updateMeta(m) {
+      // ZMIANA: Logika dostosowana do danych z Cuescore
+      const round = m.round || '';
+      document.getElementById('roundName').textContent = round;
+      document.getElementById('tableText').textContent = m.table ? `Table ${m.table}` : '';
+
+      const race = parseInt(m.raceTo, 10) || 0;
+      const disciplineLabel = m.discipline || 'Pool'; // Używamy nazwy dyscypliny bezpośrednio z API
+
+      const raceText = `Cuescore   |  ${disciplineLabel}  |  Race to ${race}`;
+      document.getElementById('raceToText').textContent = raceText;
+    }
+
+    function toggleTimeout(status){
+      const alert = document.getElementById('timeoutAlert');
+      // UWAGA: Cuescore API może nie dostarczać statusu 'timeout' w ten sam sposób.
+      // Ta funkcja może wymagać dostosowania lub może przestać działać, jeśli Cuescore inaczej oznacza timeouty.
+      const isTimeout = status?.toLowerCase() === 'timeout'; 
+      console.log('Status:', status, '-> timeout?', isTimeout);
+      alert.style.display = isTimeout ? 'block' : 'none';
+    }
+
+    function buildHistory(arr){
+      const box  = document.getElementById('playerMatchHistoryContainer');
+      const list = document.getElementById('playerMatchHistoryList');
+      list.innerHTML='';
+      if(arr.length < 1){box.style.display='none';return;}
+
+      // ZMIANA: Uproszczona logika budowania historii, backend dostarcza już sformatowane stringi
+      arr.forEach(e => {
+        const div=document.createElement('div');
+        div.textContent = e; // Backend dostarcza już gotowy tekst
+        list.appendChild(div);
+      });
+
+      document.getElementById('playerMatchHistoryTitle').textContent='Last matches:';
+      box.style.display='block'; 
+      fitHistoryFont();
+    }
+
+    function fitHistoryFont(){
+      const box=document.getElementById('playerMatchHistoryContainer');
+      let size=16; box.style.fontSize=size+'px';
+      while(box.scrollWidth>200 && size>9){box.style.fontSize=(--size)+'px';}
+    }
+
+    function formatName(n){
+      // Ta funkcja może wymagać dostosowania, jeśli format nazwisk z Cuescore jest inny
+       return n.trim().split(' ').map(w=>/^[A-ZĄĆĘŁŃÓŚŹŻ\-]+$/.test(w)
+        ?`<strong>${w}</strong>`:w).join(' ');
+    }
+
+    function highlightWinner(el1,el2,s1,s2,r){
+      el1.classList.toggle('score-win',s1===r);
+      el2.classList.toggle('score-win',s2===r);
+    }
+    
+    // Uruchomienie
+    updateOverlay(); 
+    setInterval(updateOverlay, 5000); // Pozostawiamy odświeżanie co 5 sekund
+  </script>
+</body>
+</html>
+Jak tego używać?
+Zapisz pliki: Zapisz powyższe kody jako backend.js i index.html.
+Uruchom backend: W terminalu, w folderze z plikiem backend.js, uruchom go komendą node backend.js. Upewnij się, że masz zainstalowane zależności (npm install express axios cheerio cors).
+Otwórz overlay: Otwórz plik index.html w przeglądarce, dodając w adresie URL playerId z Cuescore. Na przykład: file:///sciezka/do/twojego/folderu/index.html?playerId=5408975
+Ważne uwagi
+Zależność od "Live Match": Cały system opiera się na tym, że na stronie profilowej gracza w Cuescore (https://cuescore.com/player/...) znajduje się aktywna sekcja <div class="liveMatches card">. Jeśli gracz nie gra meczu na żywo, backend zwróci błąd 404 i overlay nie pokaże danych.
+Status "Timeout": Funkcja toggleTimeout została zachowana, ale jest mało prawdopodobne, że API Cuescore zwraca status timeout w taki sam sposób jak EPBF. Może się okazać, że ta funkcja nie będzie działać bez dalszych modyfikacji lub znalezienia sposobu, w jaki Cuescore oznacza timeout.
+Zmiany w API/Stronie Cuescore: Rozwiązanie jest wrażliwe na zmiany w strukturze strony gracza Cuescore (część scrapująca) oraz w odpowiedzi z ich API. Jeśli Cuescore coś zmieni, kod może wymagać aktualizacji.
+Nazwy graczy: Funkcja formatName próbująca pogrubić nazwisko (pisane wielkimi literami) została zachowana, ale jej skuteczność zależy od formatu nazw zwracanych przez API Cuescore.
+Logo sponsorów: Logika wyświetlania logotypów sponsorów w index.html nadal opiera się na starych ID graczy z EPBF. Musisz zaktualizować te warunki (if(pid===...)), używając ID graczy z Cuescore.
+
+
+
+
+
+jak ma wygladac adres z przykłądowym ID gdy wrzuciłem index.html do cuescore-overlay.netlify.app?
+
+
+
+Show thinking
+Jeśli Twoja aplikacja została wdrożona na Netlify pod adresem cuescore-overlay.netlify.app, to przykładowy, działający adres URL będzie wyglądał tak:
+
+https://cuescore-overlay.netlify.app?playerId=5408975
+
+Rozbicie adresu na części:
+https://cuescore-overlay.netlify.app - To jest podstawowy adres Twojej wdrożonej aplikacji na Netlify.
+? - Znak zapytania, który oddziela adres główny od parametrów zapytania.
+playerId=5408975 - To jest parametr, który przekazujesz do skryptu.
+playerId to nazwa parametru, której nasłuchuje Twój skrypt w pliku index.html.
+5408975 to przykładowa wartość, czyli ID gracza z Cuescore, które zostanie użyte do pobrania danych.
+Wystarczy, że wkleisz ten adres do przeglądarki, a Twój overlay powinien zacząć pobierać i wyświetlać dane dla gracza o ID 5408975.
+
+
+
+
+
+
+
+a gdzie wrzucic nowy link do railway cuescore-overlay-backend.railway.internal
+
+
+
+Show thinking
+Jasne, ten nowy adres URL z Railway musisz wstawić w pliku index.html.
+
+Znajdź w swoim kodzie index.html fragment odpowiedzialny za odpytywanie API. To ta linijka wewnątrz funkcji updateOverlay:
+
+Obecnie masz tam prawdopodobnie adres lokalny:
+
+JavaScript
+
+const api=`http://localhost:3000/score?playerId=${pid}`; // Zmień na URL produkcyjny Twojego backendu
+Musisz zamienić go na nowy adres z Railway:
+
+JavaScript
+
+const api=`https://cuescore-overlay-backend.railway.internal/score?playerId=${pid}`;
+Ważne uwagi:
+Użyj https://: Aplikacje na Railway domyślnie działają po bezpiecznym protokole HTTPS. Nawet jeśli adres, który dostałeś, nie zawierał https:// na początku, powinieneś go dodać.
+Nie zmieniaj reszty: Zwróć uwagę, że zmieniasz tylko http://localhost:3000 na https://cuescore-overlay-backend.railway.internal. Ścieżka /score?playerId=${pid} musi pozostać bez zmian, ponieważ tak jest skonstruowany Twój backend.
+Po tej zmianie, zapisz plik index.html i wdróż go ponownie na Netlify. Od tego momentu frontend (na Netlify) będzie komunikował się z Twoim nowym backendem na Railway
