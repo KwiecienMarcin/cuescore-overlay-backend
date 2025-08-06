@@ -1,6 +1,6 @@
 const express = require('express');
 const axios = require('axios');
-const puppeteer = require('puppeteer');
+const cheerio = require('cheerio'); // Cheerio jest nadal potrzebne do scrapowania strony gracza
 const cors = require('cors');
 
 const app = express();
@@ -8,6 +8,7 @@ app.use(cors());
 
 const PORT = process.env.PORT || 3000;
 
+// Funkcja pomocnicza do upewnienia się, że URL jest pełny
 function ensureAbsoluteUrl(url) {
   if (url.startsWith('//')) {
     return `https:${url}`;
@@ -26,7 +27,7 @@ app.get('/score', async (req, res) => {
   }
 
   try {
-    // KROK 1: Pobierz URL profilu gracza
+    // KROK 1: Pobierz URL strony gracza z API Cuescore, aby mieć pewność, że mamy poprawny link
     const participantApiUrl = `https://api.cuescore.com/participant/?id=${playerId}`;
     const participantResponse = await axios.get(participantApiUrl);
     const playerPageUrl = ensureAbsoluteUrl(participantResponse.data.url);
@@ -35,36 +36,42 @@ app.get('/score', async (req, res) => {
       return res.status(404).json({ error: 'Player URL not found in Cuescore participant API.' });
     }
 
-    // KROK 2: Scrapuj stronę gracza w poszukiwaniu linku do turnieju live
+    // KROK 2: Scrapuj stronę gracza w poszukiwaniu linku do turnieju na żywo
     const playerPageHtml = (await axios.get(playerPageUrl)).data;
-    const liveMatchLinkMatch = playerPageHtml.match(/href="\/tournament\/[^\/]+\/\d+\/match\/\d+"/);
-    if (!liveMatchLinkMatch) {
+    const $ = cheerio.load(playerPageHtml);
+
+    const liveMatchLink = $('.liveMatches .match .name a').attr('href');
+
+    if (!liveMatchLink) {
       return res.status(404).json({ error: 'No live match found on player\'s Cuescore page.' });
     }
 
-    const liveMatchLink = liveMatchLinkMatch[0].match(/\/tournament\/[^\/]+\/\d+/)[0];
-    const tournamentIdMatch = liveMatchLink.match(/\/tournament\/[^\/]+\/(\d+)/);
-    const tournamentId = tournamentIdMatch ? tournamentIdMatch[1] : null;
-
-    if (!tournamentId) {
-      return res.status(500).json({ error: 'Could not extract tournamentId.' });
+    // KROK 3: Wyciągnij ID turnieju z linku
+    const tournamentIdMatch = liveMatchLink.match(/tournament\/[^\/]+\/(\d+)/);
+    if (!tournamentIdMatch || !tournamentIdMatch[1]) {
+      return res.status(500).json({ error: 'Could not extract tournamentId from live match link.' });
     }
+    const tournamentId = tournamentIdMatch[1];
 
-    // KROK 3: Pobierz dane o turnieju z API
+    // KROK 4: Użyj ID turnieju, aby pobrać wszystkie dane o meczach z API
     const tournamentApiUrl = `https://api.cuescore.com/tournament/?id=${tournamentId}`;
     const tournamentResponse = await axios.get(tournamentApiUrl);
     const allTournamentMatches = tournamentResponse.data.matches;
 
+    // KROK 5: Filtruj mecze, aby znaleźć tylko te z udziałem naszego gracza
     const playerMatches = allTournamentMatches.filter(match =>
-      match.playerA.playerId == playerId || match.playerB.playerId == playerId
+        match.playerA.playerId == playerId || match.playerB.playerId == playerId
     );
 
     if (playerMatches.length === 0) {
-      return res.status(404).json({ error: 'No matches found for this player.' });
+      return res.status(404).json({ error: 'No matches found for the player in the live tournament.' });
     }
 
+    // KROK 6: Mapuj dane do formatu oczekiwanego przez frontend
     const formattedMatches = playerMatches.map(match => {
+      // Upewnij się, że "nasz" gracz jest zawsze jako player1
       const isPlayerA = match.playerA.playerId == playerId;
+
       const playerA = match.playerA;
       const playerB = match.playerB;
 
@@ -79,57 +86,23 @@ app.get('/score', async (req, res) => {
         table: Array.isArray(match.table) ? match.table.join(', ') : match.table,
         flag1: isPlayerA ? playerA.country?.image : playerB.country?.image,
         flag2: isPlayerA ? playerB.country?.image : playerA.country?.image,
-        status: match.matchstatus,
+        status: match.matchstatus, // "playing", "finished", etc.
         discipline: match.discipline
       };
     });
 
-    const currentMatch = formattedMatches.pop();
-    const startScore = {
-      score1: currentMatch.score1,
-      score2: currentMatch.score2
-    };
+    // Ostatni mecz to mecz bieżący
+    const currentMatch = formattedMatches.pop(); // Usuwa i zwraca ostatni element
 
-    const matchHistory = formattedMatches.map(match =>
-      `${match.round}: ${match.player1} ${match.score1} - ${match.score2} ${match.player2}`
-    );
-
-    // KROK 4: Scrapowanie danych ogólnych o turnieju przez Puppeteer
-    const fullTournamentUrl = `https://cuescore.com${liveMatchLink}`;
-    const browser = await puppeteer.launch({ headless: true });
-    const page = await browser.newPage();
-    await page.goto(fullTournamentUrl, { waitUntil: 'networkidle0' });
-
-    const tournamentInfo = await page.evaluate(() => {
-      const name = document.querySelector('.main h1')?.textContent?.trim() || '';
-      const date = document.querySelector('.meta')?.textContent?.trim() || '';
-      const club = document.querySelector('.location a')?.textContent?.trim() || '';
-
-      const metaElements = Array.from(document.querySelectorAll('.meta'));
-      const formatLine = metaElements.find(el => el.textContent?.includes('Uczestnicy'))?.textContent?.trim() || '';
-      const handicapLine = metaElements.find(el => el.textContent?.toLowerCase().includes('handicap'))?.textContent?.trim() || '';
-
-      const formatMatch = formatLine.match(/^(.+?)\s+\((\d+)\s+Uczestnicy/);
-      const format = formatMatch ? formatMatch[1] : '';
-      const playersCount = formatMatch ? formatMatch[2] : '';
-
-      return {
-        name,
-        date,
-        club,
-        format,
-        playersCount,
-        handicap: handicapLine
-      };
+    // Reszta to historia
+    const history = formattedMatches.map(match => {
+      // Proste formatowanie historii
+      return `${match.round}: ${match.player1} ${match.score1} - ${match.score2} ${match.player2}`;
     });
 
-    await browser.close();
-
     return res.json({
-      tournamentInfo,
-      allMatches: [currentMatch],
-      matchHistory: matchHistory.reverse(),
-      startScore
+      allMatches: [currentMatch], // Zwracamy jako tablicę z jednym elementem, aby pasowało do logiki frontendu
+      matchHistory: history.reverse() // Odwracamy, aby najnowsze mecze historii były na górze
     });
 
   } catch (e) {
