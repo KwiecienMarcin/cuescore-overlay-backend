@@ -313,7 +313,7 @@
   async function updateOverlay(){
     // ZMIANA: Usunięto warunek na 'tid' i zmieniono URL API
     if(!pid){console.warn('Brak parametru playerId w adresie URL');return;}
-    const api=`https://cuescore-overlay-backend.railway.internal/score?playerId=${pid}`;
+    const api = `https://cuescore-overlay-backend-production.up.railway.app/score?playerId=${pid}`;
 
     try{
       const r = await fetch(api);
