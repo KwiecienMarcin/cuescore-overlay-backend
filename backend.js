@@ -29,16 +29,17 @@ function shortenRoundName(roundName) {
   if (name === 'semi final') return 'SF';
   if (name === 'final') return 'F';
 
-  // Wyciągnij pierwszą literę pierwszego słowa, duża litera
-  const firstLetter = roundName.trim()[0].toUpperCase();
+  const words = name.split(/\s+/);
+  let result = '';
 
-  // Znajdź pierwszą liczbę (np. "Round 4" → 4)
-  const numberMatch = roundName.match(/\d+/);
-  const number = numberMatch ? numberMatch[0] : '';
+  for (const word of words) {
+    const digit = word.match(/\d+/);
+    const letter = word[0] ? word[0].toUpperCase() : '';
+    result += letter + (digit ? digit[0] : '');
+  }
 
-  return firstLetter + number;
+  return result;
 }
-
 
 app.get('/score', async (req, res) => {
   const { playerId } = req.query;
