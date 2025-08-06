@@ -39,6 +39,32 @@ function shortenRoundName(roundName) {
   return firstLetter + number;
 }
 
+// 🔧 Nowa funkcja do skracania pełnych nazwisk na same ostatnie człony
+function shortenNamesInHistory(history) {
+  return history.map(entry => {
+    // Regex znajdzie wynik (np. "4 - 3")
+    const scoreRegex = /\d+\s*-\s*\d+/;
+    const scoreMatch = entry.match(scoreRegex);
+
+    if (!scoreMatch) return entry;
+
+    const score = scoreMatch[0];
+    const parts = entry.split(score);
+
+    if (parts.length !== 2) return entry;
+
+    // Weź ostatnie słowo (nazwisko) z lewej i prawej części
+    const leftLastName = parts[0].trim().split(' ').slice(-1)[0];
+    const rightLastName = parts[1].trim().split(' ').slice(-1)[0];
+
+    // Zwróć tekst w formacie: "ROUND: leftLastName score rightLastName"
+    // ROUND jest w `parts[0]` przed nazwiskiem, więc wyciągamy prefix (np. "SF: ", "R5: ") jeśli jest
+    const roundMatch = parts[0].match(/^[A-Z0-9: ]+/i);
+    const roundPrefix = roundMatch ? roundMatch[0].trim() : '';
+
+    return `${roundPrefix} ${leftLastName} ${score} ${rightLastName}`.trim();
+  });
+}
 
 app.get('/score', async (req, res) => {
   const { playerId } = req.query;
@@ -119,9 +145,12 @@ app.get('/score', async (req, res) => {
       return `${shortRound}: ${match.player1} ${match.score1} - ${match.score2} ${match.player2}`;
     });
 
+    // Skróć pełne nazwy do samych nazwisk w historii
+    const shortenedHistory = shortenNamesInHistory(history);
+
     return res.json({
       allMatches: [currentMatch],
-      matchHistory: history.reverse()
+      matchHistory: shortenedHistory.reverse()
     });
 
   } catch (e) {
