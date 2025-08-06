@@ -8,10 +8,10 @@ app.use(cors());
 
 const PORT = process.env.PORT || 3000;
 
-// 🔹 Pamięć wyników startowych w RAM
+// 🧠 Pamięć na wynik początkowy meczu (w RAM)
 const startScores = new Map();
 
-// 🔸 Funkcja pomocnicza do pełnego URL
+// 🔧 Upewniamy się, że URL jest kompletny
 function ensureAbsoluteUrl(url) {
   if (url.startsWith('//')) {
     return `https:${url}`;
@@ -22,7 +22,6 @@ function ensureAbsoluteUrl(url) {
   return `https://cuescore.com${url}`;
 }
 
-// 🔸 GŁÓWNY ENDPOINT: /score
 app.get('/score', async (req, res) => {
   const { playerId } = req.query;
 
@@ -31,6 +30,7 @@ app.get('/score', async (req, res) => {
   }
 
   try {
+    // 🔗 Pobierz dane gracza z Cuescore API
     const participantApiUrl = `https://api.cuescore.com/participant/?id=${playerId}`;
     const participantResponse = await axios.get(participantApiUrl);
     const playerPageUrl = ensureAbsoluteUrl(participantResponse.data.url);
@@ -39,6 +39,7 @@ app.get('/score', async (req, res) => {
       return res.status(404).json({ error: 'Player URL not found in Cuescore participant API.' });
     }
 
+    // 🔍 Scrapowanie strony gracza
     const playerPageHtml = (await axios.get(playerPageUrl)).data;
     const $ = cheerio.load(playerPageHtml);
     const liveMatchLink = $('.liveMatches .match .name a').attr('href');
@@ -47,16 +48,48 @@ app.get('/score', async (req, res) => {
       return res.status(404).json({ error: 'No live match found on player\'s Cuescore page.' });
     }
 
+    // 🎯 Wyciągnięcie ID turnieju z linku
     const tournamentIdMatch = liveMatchLink.match(/tournament\/[^\/]+\/(\d+)/);
     if (!tournamentIdMatch || !tournamentIdMatch[1]) {
       return res.status(500).json({ error: 'Could not extract tournamentId from live match link.' });
     }
+
     const tournamentId = tournamentIdMatch[1];
 
+    // 🧠 SCRAPOWANIE STRONY TURNIEJU
+    const tournamentUrl = `https://cuescore.com/tournament/${tournamentId}`;
+    const tournamentPageHtml = (await axios.get(tournamentUrl)).data;
+    const $$ = cheerio.load(tournamentPageHtml);
+
+    const tournamentName = $$('h1.tournament-header').text().trim();
+    const infoSpans = $$('.info span');
+    const date = infoSpans.eq(0).text().trim();
+    const club = infoSpans.eq(1).text().trim();
+
+    const formatLine = $$('.info').text();
+    const formatMatch = formatLine.match(/([A-Za-ząćęłńóśźżĄĆĘŁŃÓŚŹŻ\s\-]+)\s+\((\d+)\s+Uczestnicy\)/);
+    const format = formatMatch ? formatMatch[1].trim() : '';
+    const playersCount = formatMatch ? parseInt(formatMatch[2]) : 0;
+
+    const handicapMatch = formatLine.match(/(Bez handicapu|Handicap[\w\s]*)/);
+    const handicap = handicapMatch ? handicapMatch[1].trim() : '';
+
+    const tournamentInfo = {
+      tournamentId,
+      tournamentName,
+      date,
+      club,
+      format,
+      playersCount,
+      handicap
+    };
+
+    // 📡 Pobierz mecze turnieju z API
     const tournamentApiUrl = `https://api.cuescore.com/tournament/?id=${tournamentId}`;
     const tournamentResponse = await axios.get(tournamentApiUrl);
     const allTournamentMatches = tournamentResponse.data.matches;
 
+    // 🎯 Filtruj mecze z udziałem naszego gracza
     const playerMatches = allTournamentMatches.filter(match =>
       match.playerA.playerId == playerId || match.playerB.playerId == playerId
     );
@@ -65,6 +98,7 @@ app.get('/score', async (req, res) => {
       return res.status(404).json({ error: 'No matches found for the player in the live tournament.' });
     }
 
+    // 🧾 Formatowanie meczów
     const formattedMatches = playerMatches.map(match => {
       const isPlayerA = match.playerA.playerId == playerId;
       const playerA = match.playerA;
@@ -86,12 +120,12 @@ app.get('/score', async (req, res) => {
       };
     });
 
-    const currentMatch = formattedMatches.pop();
+    const currentMatch = formattedMatches.pop(); // ostatni mecz = aktualny
     const history = formattedMatches.map(match => {
       return `${match.round}: ${match.player1} ${match.score1} - ${match.score2} ${match.player2}`;
     });
 
-    // 🧠 Zapamiętaj wynik startowy
+    // ⏱ Zapisz wynik startowy
     const matchId = currentMatch.matchId;
     if (!startScores.has(matchId)) {
       startScores.set(matchId, {
@@ -102,10 +136,12 @@ app.get('/score', async (req, res) => {
 
     const startScore = startScores.get(matchId);
 
+    // 📤 Odpowiedź
     return res.json({
       allMatches: [currentMatch],
       matchHistory: history.reverse(),
-      startScore
+      startScore,
+      tournamentInfo
     });
 
   } catch (e) {
@@ -115,48 +151,4 @@ app.get('/score', async (req, res) => {
   }
 });
 
-// 🔸 NOWY ENDPOINT: /tournament-info
-app.get('/tournament-info', async (req, res) => {
-  const { tournamentId } = req.query;
-
-  if (!tournamentId) {
-    return res.status(400).json({ error: 'Missing tournamentId parameter' });
-  }
-
-  try {
-    const url = `https://cuescore.com/tournament/${tournamentId}`;
-    const response = await axios.get(url);
-    const $ = cheerio.load(response.data);
-
-    // ⬇️ Dostosuj selektory do struktury strony cuescore.com
-    const tournamentName = $('h1.tournament-header').text().trim();
-    const date = $('.info').find('span').first().text().trim();
-    const club = $('.info').find('span').eq(1).text().trim();
-
-    const formatLine = $('.info').text();
-    const formatMatch = formatLine.match(/([A-Za-ząćęłńóśźżĄĆĘŁŃÓŚŹŻ\s\-]+)\s+\((\d+)\s+Uczestnicy\)/);
-    const format = formatMatch ? formatMatch[1].trim() : '';
-    const playersCount = formatMatch ? parseInt(formatMatch[2]) : 0;
-
-    const handicapMatch = formatLine.match(/(Bez handicapu|Handicap[\w\s]*)/);
-    const handicap = handicapMatch ? handicapMatch[1].trim() : '';
-
-    return res.json({
-      tournamentName,
-      date,
-      club,
-      format,
-      playersCount,
-      handicap
-    });
-
-  } catch (e) {
-    console.error(e);
-    return res.status(500).json({ error: 'Failed to fetch or parse tournament info.', details: e.message });
-  }
-});
-
-// 🔸 Start serwera
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
