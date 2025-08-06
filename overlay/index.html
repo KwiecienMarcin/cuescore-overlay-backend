@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, initial-scale=1.0" />
-  <title>EPBF Overlay</title>
-  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;700&display=swap" rel="stylesheet">
+  <title>Cuescore Overlay</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;700&display=swap" rel="stylesheet" />
   <style>
     html, body {
       width: 1920px;
@@ -14,18 +14,15 @@
       overflow: hidden;
       font-family: 'Rajdhani', sans-serif;
     }
-
     @keyframes pulseDarkRed {
       0%, 100% { background: #a80b1b; }
       50% { background: #840808; }
     }
-
     @keyframes fadeLogoLoop {
       0%, 40% { opacity: 1; }
       50%, 90% { opacity: 0; }
       100% { opacity: 1; }
     }
-
     #overlay-bar {
       position: fixed;
       bottom: 0;
@@ -39,14 +36,12 @@
       flex-direction: column;
       align-items: center;
     }
-
     .decor-line {
       width: 100%;
       height: 2px;
       background: linear-gradient(to right, transparent 0%, #fff 50%, transparent 100%);
       margin: 3px 0;
     }
-
     .player-line {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
@@ -54,14 +49,12 @@
       width: 100%;
       margin: 2px 0;
     }
-
     .score-wrapper {
       display: flex;
       align-items: center;
       justify-content: center;
       min-width: 150px;
     }
-
     .score-box {
       display: flex;
       align-items: center;
@@ -69,66 +62,55 @@
       font-size: 24px;
       font-weight: bold;
     }
-
     .player {
       display: flex;
       align-items: center;
       gap: 14.4px;
       font-size: 20px;
     }
-
     #leftPlayer {
       justify-content: flex-end;
       padding-right: 1px;
     }
-
     #rightPlayer {
       justify-content: flex-start;
       padding-left: 1px;
     }
-
     .player img {
       width: 28px;
       height: 20px;
       object-fit: contain;
     }
-
     .score {
       background: #a80b1b;
       padding: 2.4px 9.6px;
       border-radius: 4.8px;
-      transition: background-color .5s;
+      transition: background-color 0.5s;
     }
-
     .score-box.decisive .score {
       animation: pulseDarkRed 2s infinite;
     }
-
     .score-win {
       background: #FFD700 !important;
       color: #000 !important;
     }
-
     .score-highlight {
       background: #FFD700 !important;
       color: #000 !important;
     }
-
     #raceToText {
       font-size: 14.4px;
       margin-top: 1.2px;
       text-align: center;
       width: 100%;
     }
-
     #watermark {
       position: absolute;
       bottom: 2px;
       right: -170px;
       font-size: 12px;
-      color: rgba(255,255,255,0.8);
+      color: rgba(255, 255, 255, 0.8);
     }
-
     #logoLeftArea {
       position: fixed;
       top: 20px;
@@ -138,11 +120,9 @@
       align-items: center;
       gap: 8px;
     }
-
     #logoLeft {
       height: 83px;
     }
-
     #eventTitle, #roundName, #tableText {
       font-size: 24px;
       font-weight: bold;
@@ -151,7 +131,6 @@
       color: #fff;
       text-shadow: 1px 1px 4px #000;
     }
-
     #sponsorLogos {
       position: fixed;
       left: 20px;
@@ -160,7 +139,6 @@
       height: 160px;
       display: none;
     }
-
     .sponsor-logo {
       width: 100%;
       height: 100%;
@@ -171,15 +149,12 @@
       animation: fadeLogoLoop 15s ease-in-out infinite;
       animation-fill-mode: both;
     }
-
     #logoLongoni {
       animation-delay: 0s;
     }
-
     #logoTaom {
       animation-delay: 7.5s;
     }
-
     #logoRight {
       position: fixed;
       top: 20px;
@@ -188,37 +163,34 @@
       height: 150px;
       z-index: 3;
     }
-
     #playerMatchHistoryContainer {
       position: fixed;
       top: 190px;
       right: 10px;
       max-width: 200px;
       color: #fff;
-      background: rgba(0,0,0,.5);
+      background: rgba(0, 0, 0, 0.5);
       padding: 10px;
       border-radius: 8px;
       font-size: 16px;
       white-space: nowrap;
       display: none;
       z-index: 10;
+      overflow: hidden;
     }
-
     #playerMatchHistoryTitle {
       font-weight: bold;
       margin-bottom: 8px;
     }
-
     #playerMatchHistoryList div {
       margin-bottom: 4px;
     }
-
     #timeoutAlert {
       position: fixed;
       bottom: 105px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(0,0,0,.5);
+      background: rgba(0, 0, 0, 0.5);
       color: #fff;
       padding: 10px 20px;
       border-radius: 8px;
@@ -231,199 +203,213 @@
       text-shadow: 1px 1px 4px #000;
     }
   </style>
-
 </head>
 <body>
-<div id="logoLeftArea">
-  <img id="logoLeft" src="austrian_open.png" alt="Austrian Open">
-  <div id="eventTitle">Austrian Open<br>St.&nbsp;Johann&nbsp;im&nbsp;Pongau</div>
-  <div id="roundName"></div>
-  <div id="tableText">Table</div>
-</div>
+  <div id="logoLeftArea">
+    <img id="logoLeft" src="austrian_open.png" alt="Austrian Open" />
+    <div id="eventTitle">Austrian Open<br />St.&nbsp;Johann&nbsp;im&nbsp;Pongau</div>
+    <div id="roundName"></div>
+    <div id="tableText">Table</div>
+  </div>
 
-<div id="sponsorLogos">
-  <img class="sponsor-logo" id="logoLongoni" src="longoni_white.png" alt="Longoni">
-  <img class="sponsor-logo" id="logoTaom" src="taom_white.png" alt="Taom">
-</div>
+  <div id="sponsorLogos">
+    <img class="sponsor-logo" id="logoLongoni" src="longoni_white.png" alt="Longoni" />
+    <img class="sponsor-logo" id="logoTaom" src="taom_white.png" alt="Taom" />
+  </div>
 
-<img id="logoRight" src="logo_muklacademy_polysk_alpha.png" alt="MuklAcademy">
+  <img id="logoRight" src="logo_muklacademy_polysk_alpha.png" alt="MuklAcademy" />
 
-<div id="timeoutAlert">Timeout</div>
+  <div id="timeoutAlert">Timeout</div>
 
-<div id="overlay-bar">
-  <div class="decor-line"></div>
+  <div id="overlay-bar">
+    <div class="decor-line"></div>
 
-  <div class="player-line">
-    <div class="player" id="leftPlayer">
-      <img id="leftFlag" alt="flag1"><span id="player1">Player 1</span>
-    </div>
+    <div class="player-line">
+      <div class="player" id="leftPlayer">
+        <img id="leftFlag" alt="flag1" /><span id="player1">Player 1</span>
+      </div>
 
-    <div class="score-wrapper">
-      <div class="score-box" id="scoreBox">
-        <span class="score" id="score1">0</span>
-        <span class="dash">-</span>
-        <span class="score" id="score2">0</span>
+      <div class="score-wrapper">
+        <div class="score-box" id="scoreBox">
+          <span class="score" id="score1">0</span>
+          <span class="dash">-</span>
+          <span class="score" id="score2">0</span>
+        </div>
+      </div>
+
+      <div class="player" id="rightPlayer">
+        <span id="player2">Player 2</span
+        ><img id="rightFlag" alt="flag2" />
       </div>
     </div>
 
-    <div class="player" id="rightPlayer">
-      <span id="player2">Player 2</span><img id="rightFlag" alt="flag2">
-    </div>
+    <div class="decor-line"></div>
+    <div id="raceToText">Race&nbsp;to&nbsp;0</div>
+    <div id="watermark">Overlay by Muklacademy/MarcinKwiecien</div>
   </div>
 
+  <div id="playerMatchHistoryContainer">
+    <div id="playerMatchHistoryTitle"></div>
+    <div id="playerMatchHistoryList"></div>
+  </div>
 
-  <div class="decor-line"></div>
-  <div id="raceToText">Race&nbsp;to&nbsp;0</div>
-  <div id="watermark">Overlay by Muklacademy/MarcinKwiecien</div>
-</div>
+  <script>
+    const url = new URLSearchParams(window.location.search);
+    const pid = url.get('playerId');
 
-<div id="playerMatchHistoryContainer">
-  <div id="playerMatchHistoryTitle"></div>
-  <div id="playerMatchHistoryList"></div>
-</div>
+    (function setupSponsorLogos() {
+      const box = document.getElementById('sponsorLogos');
+      const longo = document.getElementById('logoLongoni');
+      const taom = document.getElementById('logoTaom');
 
-<script>
-  const url = new URLSearchParams(window.location.search);
-  const pid = url.get('playerId');
-  // ZMIANA: Usunięto 'tournamentId', nie jest już potrzebne
+      if (pid === '6494') {
+        box.style.display = 'block';
+        longo.style.opacity = '1';
+        taom.style.opacity = '0';
+      } else if (pid === '3355') {
+        box.style.display = 'block';
+        longo.style.display = 'none';
+        taom.style.display = 'block';
+        taom.style.animation = 'none';
+        taom.style.opacity = '1';
+      } else {
+        box.style.display = 'none';
+      }
+    })();
 
-  // ZMIANA: Ta logika sponsorów prawdopodobnie wymaga dostosowania do ID graczy z Cuescore
-  (function setupSponsorLogos(){
-    const box = document.getElementById('sponsorLogos');
-    const longo = document.getElementById('logoLongoni');
-    const taom = document.getElementById('logoTaom');
+    let last = { score1: null, score2: null };
 
-    if(pid==='6494'){ // Przykładowe ID, zmień na ID Cuescore
-      box.style.display='block';
-      longo.style.opacity='1';
-      taom.style.opacity='0';
-    } else if(pid==='3355'){ // Przykładowe ID, zmień na ID Cuescore
-      box.style.display='block';
-      longo.style.display='none';
-      taom.style.display='block';
-      taom.style.animation='none';
-      taom.style.opacity='1';
-    } else {
-      box.style.display='none';
-    }
-  })();
-
-  let last={score1:null,score2:null};
-
-  async function updateOverlay(){
-    // ZMIANA: Usunięto warunek na 'tid' i zmieniono URL API
-    if(!pid){console.warn('Brak parametru playerId w adresie URL');return;}
-    const api = `https://cuescore-overlay-backend-production.up.railway.app/score?playerId=${pid}`;
-
-    try{
-      const r = await fetch(api);
-      // ZMIANA: Lepsza obsługa błędów z API
-      if (!r.ok) {
-        const errData = await r.json();
-        console.error('Błąd pobierania danych:', errData.error);
+    async function updateOverlay() {
+      if (!pid) {
+        console.warn('Brak parametru playerId w adresie URL');
         return;
       }
-      const d = await r.json();
+      const api = `https://cuescore-overlay-backend-production.up.railway.app/score?playerId=${pid}`;
 
-      if(!d.allMatches?.length) return;
+      try {
+        const r = await fetch(api);
+        if (!r.ok) {
+          const errData = await r.json();
+          console.error('Błąd pobierania danych:', errData.error);
+          return;
+        }
+        const d = await r.json();
 
-      const m = d.allMatches.at(0); // Bierzemy pierwszy (i jedyny) mecz z listy
-      updateNames(m);
-      updateScores(m);
-      updateMeta(m);
-      buildHistory(d.matchHistory||[]);
-      toggleTimeout(m.status);
-    }catch(e){console.error(e);}
-  }
+        if (!d.allMatches?.length) return;
 
-  function updateNames(m){
-    document.getElementById('player1').innerHTML = formatName(m.player1);
-    document.getElementById('player2').innerHTML = formatName(m.player2);
-    document.getElementById('leftFlag').src  = m.flag1 || ''; // Zabezpieczenie na wypadek braku flagi
-    document.getElementById('rightFlag').src = m.flag2 || '';
-  }
-
-  function updateScores(m){
-    const s1=parseInt(m.score1,10),s2=parseInt(m.score2,10);
-    setScore('score1',s1); setScore('score2',s2);
-
-    const race=parseInt(m.raceTo,10);
-    highlightWinner(document.getElementById('score1'),document.getElementById('score2'),s1,s2,race);
-    document.getElementById('scoreBox')
-            .classList.toggle('decisive',s1===race-1 && s2===race-1);
-
-    last={score1:s1,score2:s2};
-  }
-
-  function setScore(id,val){
-    const el=document.getElementById(id);
-    if(last[id]!==null && val!==last[id]){
-      el.classList.add('score-highlight');
-      setTimeout(()=>el.classList.remove('score-highlight'),2000);
+        const m = d.allMatches[0];
+        updateNames(m);
+        updateScores(m);
+        updateMeta(m);
+        buildHistoryUI(d.matchHistory || []);
+        toggleTimeout(m.status);
+      } catch (e) {
+        console.error(e);
+      }
     }
-    el.textContent=val;
-  }
 
-  function updateMeta(m) {
-    // ZMIANA: Logika dostosowana do danych z Cuescore
-    const round = m.round || '';
-    document.getElementById('roundName').textContent = round;
-    document.getElementById('tableText').textContent = m.table ? `Table ${m.table}` : '';
+    function updateNames(m) {
+      // Pogrub ostatni człon nazwiska w aktualnym meczu
+      document.getElementById('player1').innerHTML = formatNameBoldLast(m.player1);
+      document.getElementById('player2').innerHTML = formatNameBoldLast(m.player2);
+      document.getElementById('leftFlag').src = m.flag1 || '';
+      document.getElementById('rightFlag').src = m.flag2 || '';
+    }
 
-    const race = parseInt(m.raceTo, 10) || 0;
-    const disciplineLabel = m.discipline || 'Pool'; // Używamy nazwy dyscypliny bezpośrednio z API
+    // Funkcja formatuje nazwisko - pogrubia ostatni człon
+    function formatNameBoldLast(name) {
+      if (!name) return '';
+      const parts = name.trim().split(' ');
+      if (parts.length === 1) return `<b>${parts[0]}</b>`;
+      const last = parts.pop();
+      return parts.join(' ') + ' <b>' + last + '</b>';
+    }
 
-    const raceText = `Cuescore   |  ${disciplineLabel}  |  Race to ${race}`;
-    document.getElementById('raceToText').textContent = raceText;
-  }
+    function updateScores(m) {
+      const score1 = m.score1 ?? 0;
+      const score2 = m.score2 ?? 0;
 
-  function toggleTimeout(status){
-    const alert = document.getElementById('timeoutAlert');
-    // UWAGA: Cuescore API może nie dostarczać statusu 'timeout' w ten sam sposób.
-    // Ta funkcja może wymagać dostosowania lub może przestać działać, jeśli Cuescore inaczej oznacza timeouty.
-    const isTimeout = status?.toLowerCase() === 'timeout';
-    console.log('Status:', status, '-> timeout?', isTimeout);
-    alert.style.display = isTimeout ? 'block' : 'none';
-  }
+      document.getElementById('score1').textContent = score1;
+      document.getElementById('score2').textContent = score2;
 
-  function buildHistory(arr){
-    const box  = document.getElementById('playerMatchHistoryContainer');
-    const list = document.getElementById('playerMatchHistoryList');
-    list.innerHTML='';
-    if(arr.length < 1){box.style.display='none';return;}
+      const scoreBox = document.getElementById('scoreBox');
 
-    // ZMIANA: Uproszczona logika budowania historii, backend dostarcza już sformatowane stringi
-    arr.forEach(e => {
-      const div=document.createElement('div');
-      div.textContent = e; // Backend dostarcza już gotowy tekst
-      list.appendChild(div);
-    });
+      if (m.status === 'decisive') {
+        scoreBox.classList.add('decisive');
+      } else {
+        scoreBox.classList.remove('decisive');
+      }
 
-    document.getElementById('playerMatchHistoryTitle').textContent='Last matches:';
-    box.style.display='block';
-    fitHistoryFont();
-  }
+      if (score1 > score2) {
+        document.getElementById('score1').classList.add('score-win');
+        document.getElementById('score2').classList.remove('score-win');
+      } else if (score2 > score1) {
+        document.getElementById('score2').classList.add('score-win');
+        document.getElementById('score1').classList.remove('score-win');
+      } else {
+        document.getElementById('score1').classList.remove('score-win');
+        document.getElementById('score2').classList.remove('score-win');
+      }
 
-  function fitHistoryFont(){
-    const box=document.getElementById('playerMatchHistoryContainer');
-    let size=16; box.style.fontSize=size+'px';
-    while(box.scrollWidth>200 && size>9){box.style.fontSize=(--size)+'px';}
-  }
+      // Aktualizuj tekst "Race to"
+      document.getElementById('raceToText').textContent = 'Race to ' + (m.raceTo ?? 0);
+    }
 
-  function formatName(n){
-    // Ta funkcja może wymagać dostosowania, jeśli format nazwisk z Cuescore jest inny
-    return n.trim().split(' ').map(w=>/^[A-ZĄĆĘŁŃÓŚŹŻ\-]+$/.test(w)
-            ?`<strong>${w}</strong>`:w).join(' ');
-  }
+    function updateMeta(m) {
+      document.getElementById('roundName').textContent = m.round ?? '';
+      document.getElementById('tableText').textContent = 'Table ' + (m.table ?? '');
+    }
 
-  function highlightWinner(el1,el2,s1,s2,r){
-    el1.classList.toggle('score-win',s1===r);
-    el2.classList.toggle('score-win',s2===r);
-  }
+    // Skraca nazwy rund, zgodnie z wytycznymi
+    function shortenRoundName(round) {
+      if (!round) return '';
+      const lower = round.toLowerCase();
 
-  // Uruchomienie
-  updateOverlay();
-  setInterval(updateOverlay, 5000); // Pozostawiamy odświeżanie co 5 sekund
-</script>
+      if (lower.includes('quarter final')) return 'QF';
+      if (lower.includes('semi final')) return 'SF';
+      if (lower.includes('final')) return 'F';
+      if (lower.includes('last 16')) return 'Last 16';
+      if (lower.includes('last 32')) return 'Last 32';
+      if (lower.includes('last 64')) return 'Last 64';
+
+      return round; // Domyślnie bez zmian
+    }
+
+    // Buduje historię meczów
+    function buildHistory(arr){
+  const box  = document.getElementById('playerMatchHistoryContainer');
+  const list = document.getElementById('playerMatchHistoryList');
+  list.innerHTML='';
+  if(arr.length < 1){box.style.display='none';return;}
+
+  arr.forEach(line => {
+    const div = document.createElement('div');
+
+    // Przykład: "Last 16: Kowalski - Novak (8-5)"
+    const match = line.match(/^(.*?):\s+(.+?)\s*-\s*(.+?)\s*\(([^)]+)\)$/);
+    if (match) {
+      const [, round, p1, p2, score] = match;
+      div.innerHTML = `<strong>${round}</strong>: ${p1} - ${p2} (${score})`;
+    } else {
+      // Jeśli nie pasuje do schematu, pokaż jako plain text
+      div.textContent = line;
+    }
+
+    list.appendChild(div);
+  });
+
+  document.getElementById('playerMatchHistoryTitle').textContent='Last matches:';
+  box.style.display='block';
+  fitHistoryFont();
+}
+    // Timeout alert
+    function toggleTimeout(status) {
+      const alert = document.getElementById('timeoutAlert');
+      alert.style.display = status === 'timeout' ? 'block' : 'none';
+    }
+
+    setInterval(updateOverlay, 3000);
+    updateOverlay();
+  </script>
 </body>
 </html>

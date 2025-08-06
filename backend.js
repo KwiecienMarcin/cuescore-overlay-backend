@@ -1,6 +1,6 @@
 const express = require('express');
 const axios = require('axios');
-const cheerio = require('cheerio'); // Cheerio jest nadal potrzebne do scrapowania strony gracza
+const cheerio = require('cheerio');
 const cors = require('cors');
 
 const app = express();
@@ -8,7 +8,6 @@ app.use(cors());
 
 const PORT = process.env.PORT || 3000;
 
-// Funkcja pomocnicza do upewnienia się, że URL jest pełny
 function ensureAbsoluteUrl(url) {
   if (url.startsWith('//')) {
     return `https:${url}`;
@@ -19,6 +18,27 @@ function ensureAbsoluteUrl(url) {
   return `https://cuescore.com${url}`;
 }
 
+// 🔠 Skrócenie nazwy rundy
+function abbreviateRound(round) {
+  const roundLower = round.toLowerCase().trim();
+  if (roundLower === "last sixteen") return "L16";
+  if (roundLower === "semi final") return "SF";
+  if (roundLower === "final") return "F";
+
+  const words = round.split(" ");
+  return words.map(w => {
+    const match = w.match(/^([a-zA-Z])([0-9]*)/);
+    if (match) return match[1].toUpperCase() + match[2];
+    return '';
+  }).join('');
+}
+
+// 🧍 Wyciąganie tylko nazwiska
+function getLastName(fullName) {
+  const parts = fullName.trim().split(' ');
+  return parts[parts.length - 1];
+}
+
 app.get('/score', async (req, res) => {
   const { playerId } = req.query;
 
@@ -27,7 +47,6 @@ app.get('/score', async (req, res) => {
   }
 
   try {
-    // KROK 1: Pobierz URL strony gracza z API Cuescore, aby mieć pewność, że mamy poprawny link
     const participantApiUrl = `https://api.cuescore.com/participant/?id=${playerId}`;
     const participantResponse = await axios.get(participantApiUrl);
     const playerPageUrl = ensureAbsoluteUrl(participantResponse.data.url);
@@ -36,73 +55,74 @@ app.get('/score', async (req, res) => {
       return res.status(404).json({ error: 'Player URL not found in Cuescore participant API.' });
     }
 
-    // KROK 2: Scrapuj stronę gracza w poszukiwaniu linku do turnieju na żywo
     const playerPageHtml = (await axios.get(playerPageUrl)).data;
     const $ = cheerio.load(playerPageHtml);
-
     const liveMatchLink = $('.liveMatches .match .name a').attr('href');
 
     if (!liveMatchLink) {
       return res.status(404).json({ error: 'No live match found on player\'s Cuescore page.' });
     }
 
-    // KROK 3: Wyciągnij ID turnieju z linku
     const tournamentIdMatch = liveMatchLink.match(/tournament\/[^\/]+\/(\d+)/);
     if (!tournamentIdMatch || !tournamentIdMatch[1]) {
       return res.status(500).json({ error: 'Could not extract tournamentId from live match link.' });
     }
     const tournamentId = tournamentIdMatch[1];
 
-    // KROK 4: Użyj ID turnieju, aby pobrać wszystkie dane o meczach z API
     const tournamentApiUrl = `https://api.cuescore.com/tournament/?id=${tournamentId}`;
     const tournamentResponse = await axios.get(tournamentApiUrl);
     const allTournamentMatches = tournamentResponse.data.matches;
 
-    // KROK 5: Filtruj mecze, aby znaleźć tylko te z udziałem naszego gracza
     const playerMatches = allTournamentMatches.filter(match =>
-        match.playerA.playerId == playerId || match.playerB.playerId == playerId
+      match.playerA.playerId == playerId || match.playerB.playerId == playerId
     );
 
     if (playerMatches.length === 0) {
       return res.status(404).json({ error: 'No matches found for the player in the live tournament.' });
     }
 
-    // KROK 6: Mapuj dane do formatu oczekiwanego przez frontend
     const formattedMatches = playerMatches.map(match => {
-      // Upewnij się, że "nasz" gracz jest zawsze jako player1
       const isPlayerA = match.playerA.playerId == playerId;
-
       const playerA = match.playerA;
       const playerB = match.playerB;
+
+      const name1 = getLastName(isPlayerA ? playerA.name : playerB.name);
+      const name2 = getLastName(isPlayerA ? playerB.name : playerA.name);
 
       return {
         matchId: match.matchId,
         round: match.roundName,
-        player1: isPlayerA ? playerA.name : playerB.name,
-        player2: isPlayerA ? playerB.name : playerA.name,
+        player1: `<strong>${name1}</strong>`,
+        player2: `<strong>${name2}</strong>`,
         score1: isPlayerA ? match.scoreA : match.scoreB,
         score2: isPlayerA ? match.scoreB : match.scoreA,
         raceTo: match.raceTo,
         table: Array.isArray(match.table) ? match.table.join(', ') : match.table,
         flag1: isPlayerA ? playerA.country?.image : playerB.country?.image,
         flag2: isPlayerA ? playerB.country?.image : playerA.country?.image,
-        status: match.matchstatus, // "playing", "finished", etc.
+        status: match.matchstatus,
         discipline: match.discipline
       };
     });
 
-    // Ostatni mecz to mecz bieżący
-    const currentMatch = formattedMatches.pop(); // Usuwa i zwraca ostatni element
+    const currentMatch = formattedMatches.pop();
 
-    // Reszta to historia
     const history = formattedMatches.map(match => {
-      // Proste formatowanie historii
-      return `${match.round}: ${match.player1} ${match.score1} - ${match.score2} ${match.player2}`;
+      const abbrevRound = abbreviateRound(match.round);
+      const p1 = match.player1.replace(/<\/?strong>/g, ''); // usuń <strong> z nazwisk
+      const p2 = match.player2.replace(/<\/?strong>/g, '');
+      const s1 = parseInt(match.score1, 10);
+      const s2 = parseInt(match.score2, 10);
+
+      const boldP1 = s1 > s2 ? `<strong>${p1}</strong>` : p1;
+      const boldP2 = s2 > s1 ? `<strong>${p2}</strong>` : p2;
+
+      return `<strong>${abbrevRound}</strong>: ${boldP1} ${s1} - ${s2} ${boldP2}`;
     });
 
     return res.json({
-      allMatches: [currentMatch], // Zwracamy jako tablicę z jednym elementem, aby pasowało do logiki frontendu
-      matchHistory: history.reverse() // Odwracamy, aby najnowsze mecze historii były na górze
+      allMatches: [currentMatch],
+      matchHistory: history.reverse()
     });
 
   } catch (e) {
