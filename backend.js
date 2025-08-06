@@ -19,7 +19,7 @@ function ensureAbsoluteUrl(url) {
   return `https://cuescore.com${url}`;
 }
 
-// 🔧 Funkcja do skracania nazw rund
+// Funkcja do skracania nazw rund
 function shortenRoundName(roundName) {
   if (!roundName) return '';
 
@@ -28,6 +28,7 @@ function shortenRoundName(roundName) {
   if (name === 'last sixteen') return 'L16';
   if (name === 'semi final') return 'SF';
   if (name === 'final') return 'F';
+  if (name === 'quarter final') return 'QF'; // poprawka Q -> QF
 
   // Wyciągnij pierwszą literę pierwszego słowa, duża litera
   const firstLetter = roundName.trim()[0].toUpperCase();
@@ -39,7 +40,7 @@ function shortenRoundName(roundName) {
   return firstLetter + number;
 }
 
-// 🔧 Nowa funkcja do skracania pełnych nazwisk na same ostatnie człony
+// Funkcja skracająca pełne nazwy do samych nazwisk w historii
 function shortenNamesInHistory(history) {
   return history.map(entry => {
     // Regex znajdzie wynik (np. "4 - 3")
@@ -53,14 +54,17 @@ function shortenNamesInHistory(history) {
 
     if (parts.length !== 2) return entry;
 
-    // Weź ostatnie słowo (nazwisko) z lewej i prawej części
-    const leftLastName = parts[0].trim().split(' ').slice(-1)[0];
-    const rightLastName = parts[1].trim().split(' ').slice(-1)[0];
+    // Usuwamy prefix rundy z lewej strony, np. "QF: Witold Żarowski" -> "Witold Żarowski"
+    const leftPart = parts[0].trim();
+    const rightPart = parts[1].trim();
 
-    // Zwróć tekst w formacie: "ROUND: leftLastName score rightLastName"
-    // ROUND jest w `parts[0]` przed nazwiskiem, więc wyciągamy prefix (np. "SF: ", "R5: ") jeśli jest
-    const roundMatch = parts[0].match(/^[A-Z0-9: ]+/i);
-    const roundPrefix = roundMatch ? roundMatch[0].trim() : '';
+    const leftNameFull = leftPart.replace(/^[A-Z0-9]+:\s*/, '');
+    const leftLastName = leftNameFull.split(' ').slice(-1)[0];
+
+    const rightLastName = rightPart.split(' ').slice(-1)[0];
+
+    const roundPrefixMatch = parts[0].match(/^[A-Z0-9]+:/);
+    const roundPrefix = roundPrefixMatch ? roundPrefixMatch[0] : '';
 
     return `${roundPrefix} ${leftLastName} ${score} ${rightLastName}`.trim();
   });
@@ -140,17 +144,16 @@ app.get('/score', async (req, res) => {
     // Oddziel aktualny mecz i historię
     const currentMatch = formattedMatches.pop();
 
-    const history = formattedMatches.map(match => {
+    const historyRaw = formattedMatches.map(match => {
       const shortRound = shortenRoundName(match.round);
       return `${shortRound}: ${match.player1} ${match.score1} - ${match.score2} ${match.player2}`;
     });
 
-    // Skróć pełne nazwy do samych nazwisk w historii
-    const shortenedHistory = shortenNamesInHistory(history);
+    const history = shortenNamesInHistory(historyRaw);
 
     return res.json({
       allMatches: [currentMatch],
-      matchHistory: shortenedHistory.reverse()
+      matchHistory: history.reverse()
     });
 
   } catch (e) {
