@@ -1,6 +1,6 @@
 const express = require('express');
 const axios = require('axios');
-const cheerio = require('cheerio');
+const puppeteer = require('puppeteer');
 const cors = require('cors');
 
 const app = express();
@@ -26,37 +26,35 @@ app.get('/score', async (req, res) => {
   }
 
   try {
-    // Krok 1: Pobierz URL strony gracza
+    // KROK 1: Pobierz URL profilu gracza
     const participantApiUrl = `https://api.cuescore.com/participant/?id=${playerId}`;
     const participantResponse = await axios.get(participantApiUrl);
     const playerPageUrl = ensureAbsoluteUrl(participantResponse.data.url);
 
     if (!playerPageUrl) {
-      return res.status(404).json({ error: 'Player URL not found.' });
+      return res.status(404).json({ error: 'Player URL not found in Cuescore participant API.' });
     }
 
-    // Krok 2: Scrapuj stronę gracza, żeby znaleźć mecz na żywo
+    // KROK 2: Scrapuj stronę gracza w poszukiwaniu linku do turnieju live
     const playerPageHtml = (await axios.get(playerPageUrl)).data;
-    const $ = cheerio.load(playerPageHtml);
-
-    const liveMatchLink = $('.liveMatches .match .name a').attr('href');
-    if (!liveMatchLink) {
-      return res.status(404).json({ error: 'No live match found.' });
+    const liveMatchLinkMatch = playerPageHtml.match(/href="\/tournament\/[^\/]+\/\d+\/match\/\d+"/);
+    if (!liveMatchLinkMatch) {
+      return res.status(404).json({ error: 'No live match found on player\'s Cuescore page.' });
     }
 
-    // Krok 3: Pobierz ID turnieju
-    const tournamentIdMatch = liveMatchLink.match(/tournament\/[^\/]+\/(\d+)/);
-    if (!tournamentIdMatch || !tournamentIdMatch[1]) {
+    const liveMatchLink = liveMatchLinkMatch[0].match(/\/tournament\/[^\/]+\/\d+/)[0];
+    const tournamentIdMatch = liveMatchLink.match(/\/tournament\/[^\/]+\/(\d+)/);
+    const tournamentId = tournamentIdMatch ? tournamentIdMatch[1] : null;
+
+    if (!tournamentId) {
       return res.status(500).json({ error: 'Could not extract tournamentId.' });
     }
-    const tournamentId = tournamentIdMatch[1];
 
-    // Krok 4: Pobierz dane turnieju z API
+    // KROK 3: Pobierz dane o turnieju z API
     const tournamentApiUrl = `https://api.cuescore.com/tournament/?id=${tournamentId}`;
     const tournamentResponse = await axios.get(tournamentApiUrl);
     const allTournamentMatches = tournamentResponse.data.matches;
 
-    // Krok 5: Znajdź mecze gracza
     const playerMatches = allTournamentMatches.filter(match =>
       match.playerA.playerId == playerId || match.playerB.playerId == playerId
     );
@@ -65,7 +63,6 @@ app.get('/score', async (req, res) => {
       return res.status(404).json({ error: 'No matches found for this player.' });
     }
 
-    // Krok 6: Formatowanie meczów
     const formattedMatches = playerMatches.map(match => {
       const isPlayerA = match.playerA.playerId == playerId;
       const playerA = match.playerA;
@@ -93,40 +90,45 @@ app.get('/score', async (req, res) => {
       score2: currentMatch.score2
     };
 
-    const history = formattedMatches.map(match =>
+    const matchHistory = formattedMatches.map(match =>
       `${match.round}: ${match.player1} ${match.score1} - ${match.score2} ${match.player2}`
     );
 
-    // Krok 7: Scrapowanie dodatkowych informacji o turnieju
-    const fullTournamentUrl = ensureAbsoluteUrl(liveMatchLink.split('/match/')[0]);
-    const tournamentPageHtml = (await axios.get(fullTournamentUrl)).data;
-    const $$ = cheerio.load(tournamentPageHtml);
+    // KROK 4: Scrapowanie danych ogólnych o turnieju przez Puppeteer
+    const fullTournamentUrl = `https://cuescore.com${liveMatchLink}`;
+    const browser = await puppeteer.launch({ headless: true });
+    const page = await browser.newPage();
+    await page.goto(fullTournamentUrl, { waitUntil: 'networkidle0' });
 
-    const tournamentName = $$('.main h1').text().trim();
-    const club = $$('.location a').first().text().trim();
-    const date = $$('.meta').first().text().trim();
-    const formatAndPlayersRaw = $$('.meta').eq(1).text().trim();
-    const handicapRaw = $$('.meta').filter((i, el) => $$(el).text().includes('handicap')).text().trim();
+    const tournamentInfo = await page.evaluate(() => {
+      const name = document.querySelector('.main h1')?.textContent?.trim() || '';
+      const date = document.querySelector('.meta')?.textContent?.trim() || '';
+      const club = document.querySelector('.location a')?.textContent?.trim() || '';
 
-    // Parsowanie formatu i liczby graczy
-    const formatMatch = formatAndPlayersRaw.match(/^(.+?)\s+\((\d+)\s+Uczestnicy/);
-    const format = formatMatch ? formatMatch[1] : '';
-    const playersCount = formatMatch ? formatMatch[2] : '';
+      const metaElements = Array.from(document.querySelectorAll('.meta'));
+      const formatLine = metaElements.find(el => el.textContent?.includes('Uczestnicy'))?.textContent?.trim() || '';
+      const handicapLine = metaElements.find(el => el.textContent?.toLowerCase().includes('handicap'))?.textContent?.trim() || '';
 
-    const handicap = handicapRaw || '';
+      const formatMatch = formatLine.match(/^(.+?)\s+\((\d+)\s+Uczestnicy/);
+      const format = formatMatch ? formatMatch[1] : '';
+      const playersCount = formatMatch ? formatMatch[2] : '';
 
-    // Zwracamy pełną odpowiedź
-    return res.json({
-      tournamentInfo: {
-        name: tournamentName,
+      return {
+        name,
         date,
         club,
         format,
         playersCount,
-        handicap
-      },
+        handicap: handicapLine
+      };
+    });
+
+    await browser.close();
+
+    return res.json({
+      tournamentInfo,
       allMatches: [currentMatch],
-      matchHistory: history.reverse(),
+      matchHistory: matchHistory.reverse(),
       startScore
     });
 
