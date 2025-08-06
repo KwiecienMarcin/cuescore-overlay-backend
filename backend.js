@@ -8,10 +8,6 @@ app.use(cors());
 
 const PORT = process.env.PORT || 3000;
 
-// 🧠 Pamięć na wynik początkowy meczu (w RAM)
-const startScores = new Map();
-
-// 🔧 Upewniamy się, że URL jest kompletny
 function ensureAbsoluteUrl(url) {
   if (url.startsWith('//')) {
     return `https:${url}`;
@@ -30,75 +26,46 @@ app.get('/score', async (req, res) => {
   }
 
   try {
-    // 🔗 Pobierz dane gracza z Cuescore API
+    // Krok 1: Pobierz URL strony gracza
     const participantApiUrl = `https://api.cuescore.com/participant/?id=${playerId}`;
     const participantResponse = await axios.get(participantApiUrl);
     const playerPageUrl = ensureAbsoluteUrl(participantResponse.data.url);
 
     if (!playerPageUrl) {
-      return res.status(404).json({ error: 'Player URL not found in Cuescore participant API.' });
+      return res.status(404).json({ error: 'Player URL not found.' });
     }
 
-    // 🔍 Scrapowanie strony gracza
+    // Krok 2: Scrapuj stronę gracza, żeby znaleźć mecz na żywo
     const playerPageHtml = (await axios.get(playerPageUrl)).data;
     const $ = cheerio.load(playerPageHtml);
-    const liveMatchLink = $('.liveMatches .match .name a').attr('href');
 
+    const liveMatchLink = $('.liveMatches .match .name a').attr('href');
     if (!liveMatchLink) {
-      return res.status(404).json({ error: 'No live match found on player\'s Cuescore page.' });
+      return res.status(404).json({ error: 'No live match found.' });
     }
 
-    // 🎯 Wyciągnięcie ID turnieju z linku
+    // Krok 3: Pobierz ID turnieju
     const tournamentIdMatch = liveMatchLink.match(/tournament\/[^\/]+\/(\d+)/);
     if (!tournamentIdMatch || !tournamentIdMatch[1]) {
-      return res.status(500).json({ error: 'Could not extract tournamentId from live match link.' });
+      return res.status(500).json({ error: 'Could not extract tournamentId.' });
     }
-
     const tournamentId = tournamentIdMatch[1];
 
-    // 🧠 SCRAPOWANIE STRONY TURNIEJU
-    const tournamentUrl = `https://cuescore.com/tournament/${tournamentId}`;
-    const tournamentPageHtml = (await axios.get(tournamentUrl)).data;
-    const $$ = cheerio.load(tournamentPageHtml);
-
-    const tournamentName = $$('h1.tournament-header').text().trim();
-    const infoSpans = $$('.info span');
-    const date = infoSpans.eq(0).text().trim();
-    const club = infoSpans.eq(1).text().trim();
-
-    const formatLine = $$('.info').text();
-    const formatMatch = formatLine.match(/([A-Za-ząćęłńóśźżĄĆĘŁŃÓŚŹŻ\s\-]+)\s+\((\d+)\s+Uczestnicy\)/);
-    const format = formatMatch ? formatMatch[1].trim() : '';
-    const playersCount = formatMatch ? parseInt(formatMatch[2]) : 0;
-
-    const handicapMatch = formatLine.match(/(Bez handicapu|Handicap[\w\s]*)/);
-    const handicap = handicapMatch ? handicapMatch[1].trim() : '';
-
-    const tournamentInfo = {
-      tournamentId,
-      tournamentName,
-      date,
-      club,
-      format,
-      playersCount,
-      handicap
-    };
-
-    // 📡 Pobierz mecze turnieju z API
+    // Krok 4: Pobierz dane turnieju z API
     const tournamentApiUrl = `https://api.cuescore.com/tournament/?id=${tournamentId}`;
     const tournamentResponse = await axios.get(tournamentApiUrl);
     const allTournamentMatches = tournamentResponse.data.matches;
 
-    // 🎯 Filtruj mecze z udziałem naszego gracza
+    // Krok 5: Znajdź mecze gracza
     const playerMatches = allTournamentMatches.filter(match =>
       match.playerA.playerId == playerId || match.playerB.playerId == playerId
     );
 
     if (playerMatches.length === 0) {
-      return res.status(404).json({ error: 'No matches found for the player in the live tournament.' });
+      return res.status(404).json({ error: 'No matches found for this player.' });
     }
 
-    // 🧾 Formatowanie meczów
+    // Krok 6: Formatowanie meczów
     const formattedMatches = playerMatches.map(match => {
       const isPlayerA = match.playerA.playerId == playerId;
       const playerA = match.playerA;
@@ -120,28 +87,47 @@ app.get('/score', async (req, res) => {
       };
     });
 
-    const currentMatch = formattedMatches.pop(); // ostatni mecz = aktualny
-    const history = formattedMatches.map(match => {
-      return `${match.round}: ${match.player1} ${match.score1} - ${match.score2} ${match.player2}`;
-    });
+    const currentMatch = formattedMatches.pop();
+    const startScore = {
+      score1: currentMatch.score1,
+      score2: currentMatch.score2
+    };
 
-    // ⏱ Zapisz wynik startowy
-    const matchId = currentMatch.matchId;
-    if (!startScores.has(matchId)) {
-      startScores.set(matchId, {
-        score1: currentMatch.score1,
-        score2: currentMatch.score2
-      });
-    }
+    const history = formattedMatches.map(match =>
+      `${match.round}: ${match.player1} ${match.score1} - ${match.score2} ${match.player2}`
+    );
 
-    const startScore = startScores.get(matchId);
+    // Krok 7: Scrapowanie dodatkowych informacji o turnieju
+    const fullTournamentUrl = ensureAbsoluteUrl(liveMatchLink.split('/match/')[0]);
+    const tournamentPageHtml = (await axios.get(fullTournamentUrl)).data;
+    const $$ = cheerio.load(tournamentPageHtml);
 
-    // 📤 Odpowiedź
+    const tournamentName = $$('.main h1').text().trim();
+    const club = $$('.location a').first().text().trim();
+    const date = $$('.meta').first().text().trim();
+    const formatAndPlayersRaw = $$('.meta').eq(1).text().trim();
+    const handicapRaw = $$('.meta').filter((i, el) => $$(el).text().includes('handicap')).text().trim();
+
+    // Parsowanie formatu i liczby graczy
+    const formatMatch = formatAndPlayersRaw.match(/^(.+?)\s+\((\d+)\s+Uczestnicy/);
+    const format = formatMatch ? formatMatch[1] : '';
+    const playersCount = formatMatch ? formatMatch[2] : '';
+
+    const handicap = handicapRaw || '';
+
+    // Zwracamy pełną odpowiedź
     return res.json({
+      tournamentInfo: {
+        name: tournamentName,
+        date,
+        club,
+        format,
+        playersCount,
+        handicap
+      },
       allMatches: [currentMatch],
       matchHistory: history.reverse(),
-      startScore,
-      tournamentInfo
+      startScore
     });
 
   } catch (e) {
